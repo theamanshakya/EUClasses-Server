@@ -1,99 +1,149 @@
+from flask import Blueprint, request, jsonify
+from sqlalchemy import exc
 from main import db, bcrypt
 from main.models.User import User
-from werkzeug.security import check_password_hash
-from flask import Blueprint, request, jsonify
-from sqlalchemy.exc import IntegrityError
-from werkzeug.exceptions import BadRequest
+from flask_jwt_extended import jwt_required,create_access_token,create_refresh_token,get_jwt_identity
 
 class UserController:
-    def register_user(self, username, email, phone, password, confirm_password, role):
-        # Validate input
-        if not username or not email or not phone or not password or not confirm_password:
-            return {'message': 'All fields are required','code':400}, 400
+    def _validate_registration(self, username, email, phone, password, role):
+        errors = {}
+    
+    def get_all_students(self):
+        students = User.query.filter_by(role='student').all()
+        student_data : any = [{
+            "id" : user.id,
+            "username" : user.username,
+            "email" : user.email,
+            "phone" : user.phone,
+            "role" : user.role
+        } for user in students]  # Convert to dictionaries
+        print(student_data)
+        return student_data
 
-        # Check if the user with the same email already exists
-        existing_user = User.query.filter_by(email=email).first()
-        if existing_ufffser:
-            return {'message': 'User with the same email already exists','code':400}, 400
+    def get_student_by_id(student_id):
+        return User.query.filter_by(id=student_id, role='student').first()
 
-        # Check if password and confirm_password match
-        if password != confirm_password:
-            return {'message': 'Password and confirm password do not match','code':400}, 400
+    def create_student(data):
+        student = User(**data)  # Assuming data is a dictionary with relevant fields
+        db.session.add(student)
+        db.session.commit()
+        return student
 
-        # Hash the password securely using bcrypt
-        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+    def update_student(student_id, data):
+        student = User.query.filter_by(id=student_id, role='student').first()
+        if student:
+            for key, value in data.items():
+                setattr(student, key, value)
+            db.session.commit()
+            return student
+        else:
+            return None  # Or raise an exception if student not found
 
-        # Set default role if not provided
-        role = role or 'student'
+    def delete_student(student_id):
+        student = User.query.filter_by(id=student_id, role='student').first()
+        if student:
+            db.session.delete(student)
+            db.session.commit()
+            return True
+        else:
+            return False  # Or raise an exception if student not found
 
-        # Create a new user
-        new_user = User(username=username, email=email, phone=phone, password=hashed_password, role=role)
-        
+    def register_user(self, data):
+        errors = self._validate_registration(**data)
+        if errors:
+            return {"message": "Registration failed", "errors": errors}, 400
+
         try:
+            new_user = User(**data)
+            new_user.password = bcrypt.generate_password_hash(data["password"]).decode("utf-8")
             db.session.add(new_user)
             db.session.commit()
-            return {'message': 'User registered successfully','code':201}, 201
-        except IntegrityError as e:
+        except exc.IntegrityError as e:
             db.session.rollback()
             if "duplicate key value violates unique constraint" in str(e):
-                # Handle the duplicate username error here
-                message = "Username already exists. Please choose a different username."
-                return {'message': message, 'code': 400}, 400
-            else:
-                # Handle other IntegrityError cases
-                print(f"Error: {e}")
-                return {'message': "Registration failed due to a database error", 'code': 500}, 500
-        except BadRequest as e:
-            # Handle other specific exceptions if needed
-            print(f"Bad request: {e}")
-            return {'message': "Bad request during registration", 'code': 400}, 400
+                return {"message": "Username already exists", "error": "duplicate_username"}, 400
+            return {"message": "Registration failed due to a database error"}, 500
         except Exception as e:
-            # Handle other generic exceptions
             db.session.rollback()
-            print(f"Error: {e}")
-            return {'message': "Registration failed due to an unexpected error", 'code': 500}, 500
+            return {"message": "Registration failed due to an unexpected error"}, 500
         finally:
-            # Optionally, close the database session
             db.session.close()
 
-    def login_user(self, email, password):
-        # Validate input
-        if not email or not password:
-            return {'message': 'Email and password are required','code':400}, 400
+        return {"message": "User registered successfully"}, 201
 
-        # Find the user by email
-        user = User.query.filter_by(email=email).first()
+    def login_user(self, data):
+        if not all([data.get("email"), data.get("password")]):
+            return {"message": "Email and password are required"}, 400
 
-        if user and bcrypt.check_password_hash(user.password, password):
-            # Passwords match, login successful
-            return {'message': 'Login successful','code':200}, 200
-        else:
-            # Invalid credentials
-            return {'message': 'Invalid email or password','code':401}, 401
+        user = User.query.filter_by(email=data.get("email")).first()
+        if not user or not bcrypt.check_password_hash(user.password, data["password"]):
+            return {"message": "Invalid email or password"}, 401
 
-user_blueprint = Blueprint('user_controller', __name__)
+        # Generate access and refresh tokens
+        access_token = create_access_token(identity=user.id)
+        refresh_token = create_refresh_token(identity=user.id)
+
+        # Create session for user
+        # TODO: Implement session logic based on your chosen library (e.g., Flask-Session)
+
+        # Prepare response data
+        response_data = {"message": "Login successful", "user": user.serialize()}
+        response_data["access_token"] = access_token
+        response_data["refresh_token"] = refresh_token
+
+        return {"data": response_data}, 200
+    @jwt_required()
+    def logout_user(self):
+        # Revoke the current user's access token
+        try:
+            _revoke_current_token()
+        except KeyError:
+            return jsonify({"message": "Access token not found"}), 500
+        return jsonify({"message": "Successfully logged out"}), 200
+
+    @jwt_required()
+    def get_logged_in_user(self):
+        # Get the user ID from the JWT payload
+        user_id = get_jwt_identity()
+
+        # Fetch user details from database
+        user = User.query.get(user_id)
+
+        # Check if user exists
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+
+        # Return user details
+        return jsonify({"user": user.serialize()}), 200
+
+
+user_blueprint = Blueprint("user_controller", __name__)
 user_controller = UserController()
 
-@user_blueprint.route('/user/register', methods=['POST'])
+
+@user_blueprint.route("/user/register", methods=["POST"])
 def register_user():
     data = request.get_json()
-
-    username = data.get('username')
-    email = data.get('email')
-    phone = data.get('phone')
-    password = data.get('password')
-    confirm_password = data.get('confirm_password')
-    role = data.get('role')
-
-    result = user_controller.register_user(username, email, phone, password, confirm_password, role)
+    result = user_controller.register_user(data)
     return jsonify(result)
 
-@user_blueprint.route('/user/login', methods=['POST'])
+@user_blueprint.route("/user/login", methods=["POST"])
 def login_user():
     data = request.get_json()
+    result = user_controller.login_user(data)
+    return jsonify(result)
 
-    email = data.get('email')
-    password = data.get('password')
+@user_blueprint.route("/user/logout", methods=["POST"])
+def logout_user():
+    result = user_controller.logout_user()
+    return result
 
-    result = user_controller.login_user(email, password)
+@user_blueprint.route("/user/details", methods=["GET"])
+def get_logged_in_user():
+    result = user_controller.get_logged_in_user()
+    return result
+
+@user_blueprint.route("/user/students/all", methods=["GET"])
+def get_all_student_data():
+    result = user_controller.get_all_students()
     return jsonify(result)

@@ -28,9 +28,11 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 # Register blueprints
 from main.controllers.UserController import user_blueprint
 from main.controllers.CourseCategoryController import course_categories_blueprint
+from main.controllers.CourseController import courses_blueprint
 
 app.register_blueprint(user_blueprint)
 app.register_blueprint(course_categories_blueprint)
+app.register_blueprint(courses_blueprint)
 
 @app.after_request
 def after_request(response):

@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify
 from sqlalchemy import exc
 from main import db, bcrypt
-from main.models.User import User
-from flask_jwt_extended import jwt_required,create_access_token,create_refresh_token,get_jwt_identity
+from main.models.User import User,TokenBlocklist
+from flask_jwt_extended import jwt_required,create_access_token,create_refresh_token,get_jwt_identity,get_jwt
+from main import app
+from datetime import datetime, timezone
 
 class UserController:
     def _validate_registration(self, username, email, phone, password, role):
@@ -95,11 +97,18 @@ class UserController:
     @jwt_required()
     def logout_user(self):
         # Revoke the current user's access token
+        # print("Received request headers:", request.headers)
+
         try:
-            _revoke_current_token()
+            jti = get_jwt()["jti"]
+            now = datetime.now(timezone.utc)
+            db.session.add(TokenBlocklist(jti=jti, created_at=now))
+            db.session.commit()
+            # return jsonify(msg="JWT revoked")
+            return jsonify({"message": "Successfully logged out"}), 200
+
         except KeyError:
             return jsonify({"message": "Access token not found"}), 500
-        return jsonify({"message": "Successfully logged out"}), 200
 
     @jwt_required()
     def get_logged_in_user(self):

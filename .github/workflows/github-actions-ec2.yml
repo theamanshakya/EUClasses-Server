@@ -30,8 +30,10 @@ jobs:
 
       - name: Debug Information
         run: |
-          ls -al /home/***
-          ls -al /home/***/flask-app
+           whoami
+           id
+           ls -al /home
+           ls -al /home/ubuntu
 
       - name: Install Flask Dependencies
         run: |

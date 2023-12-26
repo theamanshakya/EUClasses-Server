@@ -1,6 +1,5 @@
 name: Deploy-Flask-to-EC2
 
-# Trigger deployment only on push to main branch
 on:
   push:
     branches:
@@ -12,19 +11,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout the files
+      - name: Checkout Repository
         uses: actions/checkout@v2
 
       - name: Deploy to Server
-        uses: easingthemes/ssh-deploy@main
+        uses: theamanshakya/ssh-deploy@main
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST: ${{ secrets.HOST_DNS }}
           REMOTE_USER: ${{ secrets.USERNAME }}
-          TARGET: /home/runneradmin/flask-app  # Adjust the path based on your project structure
+          TARGET: /home/ubuntu/flask-app  # Update the path based on your project structure
+
       - name: Verify or Create Target Directory
-        run: |
-          ssh -i ${{ secrets.EC2_SSH_KEY }} ${{ secrets.USERNAME }}@${{ secrets.HOST_DNS }} "mkdir -p /home/runneradmin/flask-app"
+        run: ssh -i ${{ secrets.EC2_SSH_KEY }} ${{ secrets.USERNAME }}@${{ secrets.HOST_DNS }} "mkdir -p /home/ubuntu/flask-app"
 
       - name: Install Python and Dependencies
         uses: actions/setup-python@v2
@@ -40,15 +39,15 @@ jobs:
 
       - name: Install Flask Dependencies
         run: |
-          cd /home/runneradmin/flask-app
+          cd /home/ubuntu/flask-app
           pip install -r requirements.txt
 
       - name: Restart Flask Application
-        uses: appleboy/ssh-action@master
+        uses: theamanshakya/ssh-action@master
         with:
           host: ${{ secrets.HOST_DNS }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            pkill -f "flask --app run.py run"  # Stop any existing Flask process
+            pkill -f "flask --app run.py run" || true  # Stop any existing Flask process if running
             nohup flask --app run.py run --host=0.0.0.0 > /dev/null 2>&1 &

@@ -28,6 +28,11 @@ jobs:
         with:
           python-version: 3.x
 
+      - name: Debug Information
+        run: |
+          ls -al /home/***
+          ls -al /home/***/flask-app
+
       - name: Install Flask Dependencies
         run: |
           cd /home/ubuntu/flask-app

@@ -129,6 +129,9 @@ class UserController:
 user_blueprint = Blueprint("user_controller", __name__)
 user_controller = UserController()
 
+@user_blueprint.route("/", methods=['GET'])
+def register_new_user():
+    return "<h1>Hello</h1>"
 
 @user_blueprint.route("/user/register", methods=["POST"])
 def register_user():

@@ -1,0 +1,37 @@
+name: Push-to-EC2
+
+# Trigger deployment only on push to main branch
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: Deploy to EC2 on master branch push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the files
+        uses: actions/checkout@v2
+
+      - name: Deploy to Server 1
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.HOST_DNS }}
+          REMOTE_USER: ${{ secrets.USERNAME }}
+          TARGET: ${{ secrets.TARGET_DIR }}
+
+      - name: Install Gunicorn and Flask Dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get install -y python3-pip
+          pip3 install gunicorn
+          cd /home/ubuntu/flask-app  # Adjust the path based on your project structure
+          pip3 install -r requirements.txt
+
+      - name: Deploy Flask App with Gunicorn
+        run: |
+          cd /home/ubuntu/flask-app
+          nohup gunicorn -w 4 -b 0.0.0.0:5000 run:app > /dev/null 2>&1 &

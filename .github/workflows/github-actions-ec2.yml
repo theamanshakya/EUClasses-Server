@@ -28,10 +28,8 @@ jobs:
           sudo apt-get -y update
           sudo apt-get install -y python3-pip
           pip3 install gunicorn
-          cd flask-app  # Adjust the path based on your project structure
           pip3 install -r requirements.txt
 
       - name: Deploy Flask App with Gunicorn
         run: |
-          cd flask-app
           nohup gunicorn -w 4 -b 0.0.0.0:5000 run:app > /dev/null 2>&1 &

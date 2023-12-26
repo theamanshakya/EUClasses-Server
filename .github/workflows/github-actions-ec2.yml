@@ -32,4 +32,4 @@ jobs:
 
       - name: Deploy Flask App with Gunicorn
         run: |
-          nohup gunicorn -w 4 -b 0.0.0.0:5000 run:app > /dev/null 2>&1 &
+          nohup gunicorn -w 4 -b 0.0.0.0:5000 run:app > gunicorn.log 2>&1 &

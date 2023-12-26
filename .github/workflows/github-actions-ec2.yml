@@ -21,7 +21,10 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST: ${{ secrets.HOST_DNS }}
           REMOTE_USER: ${{ secrets.USERNAME }}
-          TARGET: /home/ubuntu/flask-app  # Adjust the path based on your project structure
+          TARGET: /home/runneradmin/flask-app  # Adjust the path based on your project structure
+      - name: Verify or Create Target Directory
+        run: |
+          ssh -i ${{ secrets.EC2_SSH_KEY }} ${{ secrets.USERNAME }}@${{ secrets.HOST_DNS }} "mkdir -p /home/runneradmin/flask-app"
 
       - name: Install Python and Dependencies
         uses: actions/setup-python@v2
@@ -37,7 +40,7 @@ jobs:
 
       - name: Install Flask Dependencies
         run: |
-          cd /home/ubuntu/flask-app
+          cd /home/runneradmin/flask-app
           pip install -r requirements.txt
 
       - name: Restart Flask Application
